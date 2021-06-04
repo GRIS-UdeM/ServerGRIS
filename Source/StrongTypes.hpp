@@ -225,6 +225,14 @@ public:
 };
 
 //==============================================================================
+class meters_t : public StrongFloat<float, meters_t, struct MetersT>
+{
+public:
+    meters_t() = default;
+    explicit constexpr meters_t(type const & value) : StrongFloat(value) {}
+};
+
+//==============================================================================
 constexpr radians_t QUARTER_PI{ juce::MathConstants<radians_t::type>::halfPi / 2.0f };
 constexpr radians_t HALF_PI{ juce::MathConstants<radians_t::type>::halfPi };
 constexpr radians_t PI{ juce::MathConstants<radians_t::type>::pi };
