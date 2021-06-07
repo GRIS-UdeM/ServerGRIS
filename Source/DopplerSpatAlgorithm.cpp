@@ -79,47 +79,56 @@ void DopplerSpatAlgorithm::process(AudioConfig const & config,
 
         auto const & spatData{ ticket->get() };
         auto & lastSpatData{ mData.lastSpatData[source.key] };
-        auto const * sourceSamples{ sourcesBuffer[source.key].getReadPointer(0) };
+        auto * sourceSamples{ sourcesBuffer[source.key].getWritePointer(0) };
 
         for (size_t earIndex{}; earIndex < EARS_POSITIONS.size(); ++earIndex) {
             auto * dopplerSamples{ mData.dopplerLines.getWritePointer(narrow<int>(earIndex)) };
 
-            auto const currentAbsoluteDistance{ FIELD_RADIUS * lastSpatData[earIndex] };
-            auto const targetAbsoluteDistance{ FIELD_RADIUS * spatData[earIndex] };
+            auto const MAX_DISTANCE_DIFF = meters_t{ 2.0f };
 
-            auto const startingSampleIndex{ dopplerBufferSize - bufferSize
-                                            - narrow<int>(std::floor(currentAbsoluteDistance.get() * mData.sampleRate
-                                                                     / SOUND_METERS_PER_SECOND)) };
-            auto const targetSampleIndex{ dopplerBufferSize
-                                          - narrow<int>(std::floor(targetAbsoluteDistance.get() * mData.sampleRate
-                                                                   / SOUND_METERS_PER_SECOND)) };
-            auto const numOutSamples{ std::max(targetSampleIndex - startingSampleIndex, 1) };
+            auto const beginAbsoluteDistance{ FIELD_RADIUS * lastSpatData[earIndex] };
+            auto const endAbsoluteDistance{ std::clamp(FIELD_RADIUS * spatData[earIndex],
+                                                       beginAbsoluteDistance - MAX_DISTANCE_DIFF,
+                                                       beginAbsoluteDistance + MAX_DISTANCE_DIFF) };
 
-            auto * startingSample{ dopplerSamples + startingSampleIndex };
+            auto const beginDopplerIndex{ narrow<int>(
+                std::round(beginAbsoluteDistance.get() * mData.sampleRate / SOUND_METERS_PER_SECOND)) };
+            auto const endDopplerIndex{ narrow<int>(std::round(endAbsoluteDistance.get() * mData.sampleRate
+                                                               / SOUND_METERS_PER_SECOND))
+                                        + bufferSize };
+            auto numOutSamples{ endDopplerIndex - beginDopplerIndex };
+
+            auto const reverse{ numOutSamples < 0 };
+
+            if (reverse) {
+                numOutSamples = -numOutSamples;
+                std::reverse(sourceSamples, sourceSamples + bufferSize);
+            }
+
+            auto * startingSample{ dopplerSamples + beginDopplerIndex };
 
             auto const sampleRatio{ narrow<double>(bufferSize) / narrow<double>(numOutSamples) };
 
             auto & interpolator{ mInterpolators[source.key][earIndex] };
             interpolator.processAdding(sampleRatio, sourceSamples, startingSample, numOutSamples, 1.0f);
+
+            if (reverse) {
+                std::reverse(sourceSamples, sourceSamples + bufferSize);
+            }
+
+            lastSpatData[earIndex] = endAbsoluteDistance / FIELD_RADIUS;
         }
-        lastSpatData = spatData;
     }
 
     auto speakerIt{ speakersBuffer.begin() };
-    auto const sizeToKeep{ dopplerBufferSize - bufferSize };
     for (int channel{}; channel < mData.dopplerLines.getNumChannels(); ++channel) {
-        auto * dopplerBegin{ mData.dopplerLines.getWritePointer(channel) };
-        auto const * in{ dopplerBegin + sizeToKeep };
-        auto * out{ (speakerIt++)->value->getWritePointer(0) };
-        std::copy_n(in, bufferSize, out);
+        auto * dopplerSamplesBegin{ mData.dopplerLines.getWritePointer(channel) };
+        auto * dopplerSamplesEnd{ dopplerSamplesBegin + dopplerBufferSize };
+        auto * speakerSamples{ (speakerIt++)->value->getWritePointer(0) };
+        std::copy_n(dopplerSamplesBegin, bufferSize, speakerSamples);
 
-        static juce::Array<float> temp{};
-        temp.ensureStorageAllocated(dopplerBufferSize);
-        temp.clearQuick();
-        temp.addArray(dopplerBegin, sizeToKeep);
-        std::copy_n(temp.data(), temp.size(), dopplerBegin + bufferSize);
-        // std::rotate(dopplerBegin, dopplerBegin + offset, dopplerEnd);
-        std::fill_n(dopplerBegin, bufferSize, 0.0f);
+        std::rotate(dopplerSamplesBegin, dopplerSamplesBegin + bufferSize, dopplerSamplesEnd);
+        std::fill_n(dopplerSamplesEnd - bufferSize, bufferSize, 0.0f);
     }
 }
 
