@@ -25,6 +25,30 @@
 
 #include <cmath>
 
+#include <limits>
+
+// constexpr sqrt from Alex Shtof
+// https://stackoverflow.com/questions/8622256/in-c11-is-sqrt-defined-as-constexpr
+namespace Detail
+{
+double constexpr sqrtNewtonRaphson(double const x, double const curr, double const prev)
+{
+    return curr == prev ? curr : sqrtNewtonRaphson(x, 0.5 * (curr + x / curr), curr);
+}
+} // namespace Detail
+
+/*
+ * Constexpr version of the square root
+ * Return value:
+ *   - For a finite and non-negative value of "x", returns an approximation for the square root of "x"
+ *   - Otherwise, returns NaN
+ */
+double constexpr constexpr_sqrt(double const x)
+{
+    return x >= 0 && x < std::numeric_limits<double>::infinity() ? Detail::sqrtNewtonRaphson(x, x, 0)
+                                                                 : std::numeric_limits<double>::quiet_NaN();
+}
+
 struct CartesianVector {
     struct XmlTags {
         static juce::String const MAIN_TAG;
@@ -58,6 +82,11 @@ struct CartesianVector {
     [[nodiscard]] constexpr float length2() const noexcept { return x * x + y * y + z * z; }
 
     [[nodiscard]] float length() const noexcept { return std::sqrt(length2()); }
+
+    [[nodiscard]] constexpr float constexpr_length() const noexcept
+    {
+        return static_cast<float>(constexpr_sqrt(length2()));
+    }
 
     [[nodiscard]] CartesianVector crossProduct(CartesianVector const & other) const noexcept;
 

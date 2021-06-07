@@ -21,6 +21,25 @@
 
 #include "AbstractSpatAlgorithm.hpp"
 
+static constexpr meters_t FIELD_RADIUS{ 50.0f };
+static constexpr meters_t HEAD_RADIUS{ 0.075f };
+
+static constexpr CartesianVector LEFT_EAR_POSITION{ -HEAD_RADIUS / FIELD_RADIUS, 0.0f, 0.0f };
+static constexpr CartesianVector RIGHT_EAR_POSITION{ HEAD_RADIUS / FIELD_RADIUS, 0.0f, 0.0f };
+static constexpr std::array<CartesianVector, 2> EARS_POSITIONS{ LEFT_EAR_POSITION, RIGHT_EAR_POSITION };
+
+static constexpr CartesianVector UPPER_LEFT_CORNER{ 1.0f, 1.0f, 1.0f };
+
+static auto constexpr MAX_RELATIVE_DISTANCE{ (RIGHT_EAR_POSITION - UPPER_LEFT_CORNER).constexpr_length() };
+static auto constexpr MAX_DISTANCE{ FIELD_RADIUS * MAX_RELATIVE_DISTANCE };
+
+static auto constexpr MAX_SAMPLE_RATE = 48000.0;
+static auto constexpr MAX_BUFFER_SIZE = 4096;
+static auto constexpr DOPPLER_BUFFER_SIZE
+    = static_cast<int>(MAX_DISTANCE.get() * MAX_SAMPLE_RATE + narrow<double>(MAX_BUFFER_SIZE) + 1.0);
+
+static constexpr auto SOUND_METERS_PER_SECOND = 400.0f;
+
 using DopplerSpatData = std::array<float, 2>;
 using DopplerSpatDataQueue = AtomicExchanger<DopplerSpatData>;
 
@@ -33,14 +52,16 @@ struct DopplerSourceData {
 struct DopplerData {
     StrongArray<source_index_t, DopplerSourceData, MAX_NUM_SOURCES> sourcesData{};
     juce::AudioBuffer<float> dopplerLines{};
-    float dopplerLength{};
-    int bufferSize{};
+    double sampleRate{};
 };
 
 //==============================================================================
 class DopplerSpatAlgorithm final : public AbstractSpatAlgorithm
 {
+    using Interpolator = juce::CatmullRomInterpolator;
+
     DopplerData mData{};
+    std::array<Interpolator, 2> mInterpolators{};
 
 public:
     //==============================================================================
