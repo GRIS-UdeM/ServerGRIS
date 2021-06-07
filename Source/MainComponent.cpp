@@ -374,10 +374,6 @@ void MainContentComponent::handleOpenSpeakerSetup()
     JUCE_ASSERT_MESSAGE_THREAD;
     juce::ScopedReadLock const lock{ mLock };
 
-    if (!makeSureSpeakerSetupIsSavedToDisk()) {
-        return;
-    }
-
     auto const initialFile{ mData.appData.lastSpeakerSetup };
 
     juce::FileChooser fc{ "Choose a file to open...", initialFile, "*.xml", true };
@@ -389,7 +385,6 @@ void MainContentComponent::handleOpenSpeakerSetup()
     auto const chosen{ fc.getResult() };
     [[maybe_unused]] auto const success{ loadSpeakerSetup(chosen,
                                                           LoadSpeakerSetupOption::disallowDiscardingUnsavedChanges) };
-    jassert(success);
 }
 
 //==============================================================================

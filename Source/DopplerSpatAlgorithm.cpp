@@ -66,9 +66,6 @@ void DopplerSpatAlgorithm::process(AudioConfig const & config,
 
     for (auto const & source : config.sourcesAudioConfig) {
         if (sourcePeaks[source.key] < SMALL_GAIN || source.value.directOut || source.value.isMuted) {
-            if (source.key == source_index_t{ 1 }) {
-                int wow{};
-            }
             continue;
         }
 
@@ -82,28 +79,28 @@ void DopplerSpatAlgorithm::process(AudioConfig const & config,
 
         auto const & spatData{ ticket->get() };
         auto & lastSpatData{ mData.lastSpatData[source.key] };
-        auto const * inBuffer{ sourcesBuffer[source.key].getReadPointer(0) };
+        auto const * sourceSamples{ sourcesBuffer[source.key].getReadPointer(0) };
 
         for (size_t earIndex{}; earIndex < EARS_POSITIONS.size(); ++earIndex) {
-            auto * dopplerBuffer{ mData.dopplerLines.getWritePointer(narrow<int>(earIndex)) };
+            auto * dopplerSamples{ mData.dopplerLines.getWritePointer(narrow<int>(earIndex)) };
 
-            auto const startingDistance{ FIELD_RADIUS * lastSpatData[earIndex] };
-            auto const targetDistance{ FIELD_RADIUS * spatData[earIndex] };
+            auto const currentAbsoluteDistance{ FIELD_RADIUS * lastSpatData[earIndex] };
+            auto const targetAbsoluteDistance{ FIELD_RADIUS * spatData[earIndex] };
 
             auto const startingSampleIndex{ dopplerBufferSize - bufferSize
-                                            - narrow<int>(std::round(startingDistance.get() * mData.sampleRate
+                                            - narrow<int>(std::floor(currentAbsoluteDistance.get() * mData.sampleRate
                                                                      / SOUND_METERS_PER_SECOND)) };
             auto const targetSampleIndex{ dopplerBufferSize
-                                          - narrow<int>(std::round(targetDistance.get() * mData.sampleRate
+                                          - narrow<int>(std::floor(targetAbsoluteDistance.get() * mData.sampleRate
                                                                    / SOUND_METERS_PER_SECOND)) };
-            auto const numOutSamples{ targetSampleIndex - startingSampleIndex };
+            auto const numOutSamples{ std::max(targetSampleIndex - startingSampleIndex, 1) };
 
-            auto * startingSample{ dopplerBuffer + startingSampleIndex };
+            auto * startingSample{ dopplerSamples + startingSampleIndex };
 
-            auto const sampleRatio{ narrow<double>(numOutSamples) / narrow<double>(bufferSize) };
+            auto const sampleRatio{ narrow<double>(bufferSize) / narrow<double>(numOutSamples) };
 
             auto & interpolator{ mInterpolators[source.key][earIndex] };
-            interpolator.processAdding(sampleRatio, inBuffer, startingSample, numOutSamples, 1.0f);
+            interpolator.processAdding(sampleRatio, sourceSamples, startingSample, numOutSamples, 1.0f);
         }
         lastSpatData = spatData;
     }

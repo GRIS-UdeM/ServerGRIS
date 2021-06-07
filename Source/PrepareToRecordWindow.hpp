@@ -39,7 +39,7 @@ class PrepareToRecordComponent final
 
     juce::TextButton mWavButton{};
     juce::TextButton mAiffButton{};
-#ifdef __APPLE__
+#ifdef USE_CAF
     juce::TextButton mCafButton{};
 #endif
 

@@ -138,7 +138,7 @@ void PrepareToRecordComponent::resized()
     mWavButton.setBounds(xOffset, yOffset, BUTTONS_WIDTH, BUTTONS_HEIGHT);
     nextButton();
     mAiffButton.setBounds(xOffset, yOffset, BUTTONS_WIDTH, BUTTONS_HEIGHT);
-#ifdef __APPLE__
+#ifdef USE_CAF
     nextButton();
     mCafButton.setBounds(xOffset, yOffset, BUTTONS_WIDTH, BUTTONS_HEIGHT);
 #endif
@@ -232,7 +232,7 @@ bool PrepareToRecordComponent::isFileFormatButton(juce::Button const * button) c
     if (button == &mWavButton || button == &mAiffButton) {
         return true;
     }
-#ifdef __APPLE__
+#ifdef USE_CAF
     if (button == &mCafButton) {
         return true;
     }
