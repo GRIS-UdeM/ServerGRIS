@@ -46,12 +46,12 @@ using DopplerSpatDataQueue = AtomicExchanger<DopplerSpatData>;
 struct DopplerSourceData {
     DopplerSpatDataQueue spatDataQueue{};
     DopplerSpatDataQueue::Ticket * mostRecentSpatData{};
-    float lastDistance{};
 };
 
 struct DopplerData {
     StrongArray<source_index_t, DopplerSourceData, MAX_NUM_SOURCES> sourcesData{};
     juce::AudioBuffer<float> dopplerLines{};
+    StrongArray<source_index_t, DopplerSpatData, MAX_NUM_SOURCES> lastSpatData{};
     double sampleRate{};
 };
 
@@ -61,7 +61,7 @@ class DopplerSpatAlgorithm final : public AbstractSpatAlgorithm
     using Interpolator = juce::CatmullRomInterpolator;
 
     DopplerData mData{};
-    std::array<Interpolator, 2> mInterpolators{};
+    StrongArray<source_index_t, std::array<Interpolator, 2>, MAX_NUM_SOURCES> mInterpolators{};
 
 public:
     //==============================================================================

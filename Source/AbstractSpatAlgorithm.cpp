@@ -19,6 +19,7 @@
 
 #include "AbstractSpatAlgorithm.hpp"
 
+#include "DopplerSpatAlgorithm.hpp"
 #include "HrtfSpatAlgorithm.hpp"
 #include "LbapSpatAlgorithm.hpp"
 #include "StereoSpatAlgorithm.hpp"
@@ -92,7 +93,7 @@ std::unique_ptr<AbstractSpatAlgorithm> AbstractSpatAlgorithm::make(SpeakerSetup 
         case StereoMode::hrtf:
             return std::make_unique<HrtfSpatAlgorithm>(speakerSetup, sources);
         case StereoMode::stereo:
-            return std::make_unique<StereoSpatAlgorithm>(speakerSetup, sources);
+            return std::make_unique<DopplerSpatAlgorithm>(44100.0, 2048);
         }
         jassertfalse;
     }
