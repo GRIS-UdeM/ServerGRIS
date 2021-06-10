@@ -58,7 +58,7 @@ struct DopplerData {
 //==============================================================================
 class DopplerSpatAlgorithm final : public AbstractSpatAlgorithm
 {
-    using Interpolator = juce::WindowedSincInterpolator;
+    using Interpolator = juce::ZeroOrderHoldInterpolator;
 
     DopplerData mData{};
     StrongArray<source_index_t, std::array<Interpolator, 2>, MAX_NUM_SOURCES> mInterpolators{};

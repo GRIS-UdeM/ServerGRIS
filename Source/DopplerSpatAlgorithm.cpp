@@ -24,8 +24,9 @@ DopplerSpatAlgorithm::DopplerSpatAlgorithm(double const sampleRate, int const bu
 {
     mData.sampleRate = sampleRate;
     auto const dopplerLength{ MAX_DISTANCE.get() / SOUND_METERS_PER_SECOND * sampleRate };
-    auto const requiredSamples{ narrow<int>(std::ceil(dopplerLength)) + bufferSize };
+    auto const requiredSamples{ narrow<int>(std::round(dopplerLength)) + bufferSize };
     mData.dopplerLines.setSize(2, requiredSamples);
+    mData.dopplerLines.clear();
 }
 
 //==============================================================================
@@ -60,6 +61,17 @@ void DopplerSpatAlgorithm::process(AudioConfig const & config,
     ASSERT_AUDIO_THREAD;
     jassert(!altSpeakerConfig);
 
+    auto const findOffender = [](float const * begin, float const * end) {
+        auto const minMax{ std::minmax(begin, end) };
+        auto const max{ std::max(std::abs(*minMax.first), std::abs(*minMax.second)) };
+
+        if (max > 1.0f) {
+            auto const * offender{ std::abs(*minMax.first) > 1.0f ? minMax.first : minMax.second };
+            auto const distance{ offender - begin };
+            int lol{};
+        }
+    };
+
     // speakersBuffer.silence();
     auto const bufferSize{ sourcesBuffer.getNumSamples() };
     auto const dopplerBufferSize{ mData.dopplerLines.getNumSamples() };
@@ -81,8 +93,12 @@ void DopplerSpatAlgorithm::process(AudioConfig const & config,
         auto & lastSpatData{ mData.lastSpatData[source.key] };
         auto * sourceSamples{ sourcesBuffer[source.key].getWritePointer(0) };
 
+        findOffender(sourceSamples, sourceSamples + bufferSize);
+
         for (size_t earIndex{}; earIndex < EARS_POSITIONS.size(); ++earIndex) {
             auto * dopplerSamples{ mData.dopplerLines.getWritePointer(narrow<int>(earIndex)) };
+
+            findOffender(dopplerSamples, dopplerSamples + dopplerBufferSize);
 
             auto const MAX_DISTANCE_DIFF = meters_t{ 2.0f };
 
@@ -112,6 +128,8 @@ void DopplerSpatAlgorithm::process(AudioConfig const & config,
             auto & interpolator{ mInterpolators[source.key][earIndex] };
             interpolator.processAdding(sampleRatio, sourceSamples, startingSample, numOutSamples, 1.0f);
 
+            findOffender(startingSample, startingSample + bufferSize);
+
             if (reverse) {
                 std::reverse(sourceSamples, sourceSamples + bufferSize);
             }
@@ -125,10 +143,12 @@ void DopplerSpatAlgorithm::process(AudioConfig const & config,
         auto * dopplerSamplesBegin{ mData.dopplerLines.getWritePointer(channel) };
         auto * dopplerSamplesEnd{ dopplerSamplesBegin + dopplerBufferSize };
         auto * speakerSamples{ (speakerIt++)->value->getWritePointer(0) };
-        std::copy_n(dopplerSamplesBegin, bufferSize, speakerSamples);
 
+        std::copy_n(dopplerSamplesBegin, bufferSize, speakerSamples);
+        std::fill_n(dopplerSamplesBegin, bufferSize, 0.0f);
         std::rotate(dopplerSamplesBegin, dopplerSamplesBegin + bufferSize, dopplerSamplesEnd);
-        std::fill_n(dopplerSamplesEnd - bufferSize, bufferSize, 0.0f);
+
+        findOffender(dopplerSamplesBegin, dopplerSamplesEnd);
     }
 }
 
