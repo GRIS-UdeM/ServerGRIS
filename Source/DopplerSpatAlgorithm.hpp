@@ -21,7 +21,7 @@
 
 #include "AbstractSpatAlgorithm.hpp"
 
-static constexpr meters_t FIELD_RADIUS{ 20.0f };
+static constexpr meters_t FIELD_RADIUS{ 10.0f };
 static constexpr meters_t HEAD_RADIUS{ 0.075f };
 
 static constexpr CartesianVector LEFT_EAR_POSITION{ -HEAD_RADIUS / FIELD_RADIUS, 0.0f, 0.0f };
@@ -58,7 +58,7 @@ struct DopplerData {
 //==============================================================================
 class DopplerSpatAlgorithm final : public AbstractSpatAlgorithm
 {
-    using Interpolator = juce::ZeroOrderHoldInterpolator;
+    using Interpolator = juce::Interpolators::WindowedSinc;
 
     DopplerData mData{};
     StrongArray<source_index_t, std::array<Interpolator, 2>, MAX_NUM_SOURCES> mInterpolators{};
