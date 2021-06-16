@@ -64,6 +64,10 @@
               file="Source/AudioProcessor.cpp"/>
         <FILE id="bLDhY1" name="AudioProcessor.hpp" compile="0" resource="0"
               file="Source/AudioProcessor.hpp"/>
+        <FILE id="IU47To" name="Interpolator.cpp" compile="1" resource="0"
+              file="Source/Interpolator.cpp"/>
+        <FILE id="cN6gVR" name="Interpolator.hpp" compile="0" resource="0"
+              file="Source/Interpolator.hpp"/>
         <FILE id="PgRLbY" name="PinkNoiseGenerator.cpp" compile="1" resource="0"
               file="Source/PinkNoiseGenerator.cpp"/>
         <FILE id="H5EPIz" name="PinkNoiseGenerator.hpp" compile="0" resource="0"

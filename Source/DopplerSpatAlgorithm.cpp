@@ -19,6 +19,37 @@
 
 #include "DopplerSpatAlgorithm.hpp"
 
+static void interpolate(float const * inputSamples,
+                        int const numInputSamples,
+                        float * outputSamples,
+                        int const numOutputSamples) noexcept
+{
+    if (numInputSamples == numOutputSamples) {
+        std::copy_n(inputSamples, numInputSamples, outputSamples);
+        return;
+    }
+
+    auto const * in{ inputSamples };
+    auto const * const inEnd{ inputSamples + numInputSamples };
+    auto * out{ outputSamples };
+    auto const * const outEnd{ outputSamples + numOutputSamples };
+
+    auto const inputPerOutput{ static_cast<double>(numInputSamples - 1) / static_cast<double>(numOutputSamples) };
+    auto subSamplePos{ inputPerOutput };
+    auto lastSample{ *in++ };
+
+    while (out < outEnd) {
+        while (subSamplePos >= 1.0) {
+            jassert(in < inEnd);
+            lastSample = *in++;
+            subSamplePos -= 1.0;
+        }
+
+        *out++ = *in * subSamplePos + lastSample * (1.0 - subSamplePos);
+        subSamplePos += inputPerOutput;
+    }
+}
+
 //==============================================================================
 DopplerSpatAlgorithm::DopplerSpatAlgorithm(double const sampleRate, int const bufferSize)
 {
@@ -84,7 +115,7 @@ void DopplerSpatAlgorithm::process(AudioConfig const & config,
         for (size_t earIndex{}; earIndex < EARS_POSITIONS.size(); ++earIndex) {
             auto * dopplerSamples{ mData.dopplerLines.getWritePointer(narrow<int>(earIndex)) };
 
-            auto const MAX_DISTANCE_DIFF = meters_t{ 1.0f };
+            auto const MAX_DISTANCE_DIFF = meters_t{ 1000.0f };
 
             auto const beginAbsoluteDistance{ FIELD_RADIUS * lastSpatData[earIndex] };
             auto const endAbsoluteDistance{ std::clamp(FIELD_RADIUS * spatData[earIndex],
@@ -97,14 +128,23 @@ void DopplerSpatAlgorithm::process(AudioConfig const & config,
                                                                / SOUND_METERS_PER_SECOND))
                                         + bufferSize };
 
-            auto const numOutSamples{ std::max(endDopplerIndex - beginDopplerIndex, 1) };
+            auto numOutSamples{ endDopplerIndex - beginDopplerIndex };
 
-            auto * startingSample{ dopplerSamples + beginDopplerIndex };
+            auto const reverse{ numOutSamples < 1 };
 
-            auto const sampleRatio{ narrow<double>(bufferSize) / narrow<double>(numOutSamples) };
+            if (reverse) {
+                std::reverse(sourceSamples, sourceSamples + bufferSize);
+                numOutSamples *= -1;
+            }
 
-            auto & interpolator{ mInterpolators[source.key][earIndex] };
-            interpolator.processAdding(sampleRatio, sourceSamples, startingSample, numOutSamples, 1.0f);
+            auto * startingDopplerSample{ dopplerSamples + beginDopplerIndex };
+            if (numOutSamples != 0) {
+                interpolate(sourceSamples, bufferSize, startingDopplerSample, numOutSamples);
+            }
+
+            if (reverse) {
+                std::reverse(sourceSamples, sourceSamples + bufferSize);
+            }
 
             lastSpatData[earIndex] = endAbsoluteDistance / FIELD_RADIUS;
         }
