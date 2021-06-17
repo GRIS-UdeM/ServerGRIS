@@ -24,28 +24,28 @@ static void interpolate(float const * inputSamples,
                         float * outputSamples,
                         int const numOutputSamples) noexcept
 {
+#ifndef NDEBUG
+    auto const * const inEnd{ inputSamples + numInputSamples };
+#endif
+
     if (numInputSamples == numOutputSamples) {
         std::copy_n(inputSamples, numInputSamples, outputSamples);
         return;
     }
 
-    auto const * in{ inputSamples };
-    auto const * const inEnd{ inputSamples + numInputSamples };
-    auto * out{ outputSamples };
     auto const * const outEnd{ outputSamples + numOutputSamples };
-
     auto const inputPerOutput{ static_cast<double>(numInputSamples - 1) / static_cast<double>(numOutputSamples) };
     auto subSamplePos{ inputPerOutput };
-    auto lastSample{ *in++ };
+    auto lastSample{ *inputSamples++ };
 
-    while (out < outEnd) {
+    while (outputSamples < outEnd) {
         while (subSamplePos >= 1.0) {
-            jassert(in < inEnd);
-            lastSample = *in++;
+            jassert(inputSamples < inEnd);
+            lastSample = *inputSamples++;
             subSamplePos -= 1.0;
         }
 
-        *out++ = *in * subSamplePos + lastSample * (1.0 - subSamplePos);
+        *outputSamples++ = static_cast<float>(*inputSamples * subSamplePos + lastSample * (1.0 - subSamplePos));
         subSamplePos += inputPerOutput;
     }
 }
@@ -147,6 +147,16 @@ void DopplerSpatAlgorithm::process(AudioConfig const & config,
             }
 
             lastSpatData[earIndex] = endAbsoluteDistance / FIELD_RADIUS;
+
+            static constexpr auto POW{ 1.5f };
+            auto const startGain{ std::min(1.0f / std::pow(beginAbsoluteDistance.get(), POW), 1.0f) };
+            auto const endGain{ std::min(1.0f / std::pow(endAbsoluteDistance.get(), POW), 1.0f) };
+
+            juce::AudioBuffer<float>{ &startingDopplerSample, 1, numOutSamples }.applyGainRamp(0,
+                                                                                               0,
+                                                                                               numOutSamples,
+                                                                                               startGain,
+                                                                                               endGain);
         }
     }
 
