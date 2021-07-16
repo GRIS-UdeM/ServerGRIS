@@ -98,7 +98,9 @@ void AudioProcessor::muteSoloVuMeterGainOut(SpeakerAudioBuffer & speakersBuffer,
 }
 
 //==============================================================================
-void AudioProcessor::processAudio(SourceAudioBuffer & sourceBuffer, SpeakerAudioBuffer & speakerBuffer) noexcept
+void AudioProcessor::processAudio(SourceAudioBuffer & sourceBuffer,
+                                  SpeakerAudioBuffer & speakerBuffer,
+                                  juce::AudioBuffer<float> & stereoBuffer) noexcept
 {
     // Skip if the user is editing the speaker setup.
     juce::ScopedTryLock const lock{ mLock };

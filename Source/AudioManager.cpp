@@ -85,6 +85,7 @@ void AudioManager::audioDeviceIOCallback(float const ** inputChannelData,
     // clear buffers
     mInputBuffer.silence();
     mOutputBuffer.silence();
+    mStereoOutputBuffer.clear();
     std::for_each_n(outputChannelData, totalNumOutputChannels, [numSamples](float * const data) {
         std::fill_n(data, numSamples, 0.0f);
     });
@@ -105,7 +106,7 @@ void AudioManager::audioDeviceIOCallback(float const ** inputChannelData,
 
     // do the actual processing
     if (mAudioProcessor != nullptr) {
-        mAudioProcessor->processAudio(mInputBuffer, mOutputBuffer);
+        mAudioProcessor->processAudio(mInputBuffer, mOutputBuffer, mStereoOutputBuffer);
     }
 
     // copy buffers to output
@@ -243,22 +244,25 @@ bool AudioManager::prepareToRecord(RecordingParameters const & recordingParams)
         return false;
     }
 
-    // prepare audioFormat
-    std::unique_ptr<juce::AudioFormat> audioFormat{};
-    switch (recordingParams.options.format) {
-    case RecordingFormat::aiff:
-        audioFormat = std::make_unique<juce::AiffAudioFormat>();
-        break;
-    case RecordingFormat::wav:
-        audioFormat = std::make_unique<juce::WavAudioFormat>();
-        break;
+    static auto const GET_AUDIO_FORMAT = [](RecordingFormat const format) -> std::unique_ptr<juce::AudioFormat> {
+        std::unique_ptr<juce::AudioFormat> audioFormat{};
+        switch (format) {
+        case RecordingFormat::aiff:
+            return std::make_unique<juce::AiffAudioFormat>();
+        case RecordingFormat::wav:
+            return std::make_unique<juce::WavAudioFormat>();
 #ifdef USE_CAF
-    case RecordingFormat::caf:
-        audioFormat = std::make_unique<juce::CoreAudioFormat>();
+        case RecordingFormat::caf:
+            return std::make_unique<juce::CoreAudioFormat>();
 #endif
-    }
-    jassert(audioFormat);
+        }
+        return nullptr;
+    };
+
+    // prepare audioFormat
+    auto const audioFormat{ GET_AUDIO_FORMAT(recordingParams.options.format) };
     if (!audioFormat) {
+        jassertfalse;
         return false;
     }
 
@@ -300,30 +304,44 @@ bool AudioManager::prepareToRecord(RecordingParameters const & recordingParams)
     };
 
     // Compute file paths
-    juce::StringArray filePaths{};
     auto const baseOutputFile{ juce::File{ recordingParams.path }.getParentDirectory().getFullPathName() + '/'
                                + juce::File{ recordingParams.path }.getFileNameWithoutExtension() };
     auto const extension{ juce::File{ recordingParams.path }.getFileExtension() };
-    if (recordingParams.options.fileType == RecordingFileType::mono) {
-        filePaths.ensureStorageAllocated(recordingParams.speakersToRecord.size());
+
+    auto const getSeparateStereoFilePaths = [&]() {
+        juce::StringArray result{};
+        result.add(baseOutputFile + "L" + extension);
+        result.add(baseOutputFile + "R" + extension);
+        return result;
+    };
+    auto const getSeparateSpeakersFilePath = [&]() {
+        juce::StringArray result{};
+        result.ensureStorageAllocated(recordingParams.speakersToRecord.size());
         for (auto const outputPatch : recordingParams.speakersToRecord) {
-            auto pathWithoutExtension{ baseOutputFile + juce::String{ outputPatch.get() } };
-            auto newPath{ pathWithoutExtension + extension };
-            while (filePaths.contains(newPath)) {
-                pathWithoutExtension += "-2";
-                newPath = pathWithoutExtension + extension;
-            }
-            filePaths.add(newPath);
+            auto const path{ baseOutputFile + juce::String{ outputPatch.get() } + extension };
+            jassert(!result.contains(path));
+            result.add(path);
         }
-    } else {
-        jassert(recordingParams.options.fileType == RecordingFileType::interleaved);
-        filePaths.add(baseOutputFile + extension);
-    }
+        return result;
+    };
+    auto const getFilePaths = [&]() {
+        if (recordingParams.options.fileType == RecordingFileType::interleaved) {
+            return juce::StringArray{ baseOutputFile + extension };
+        }
+
+        jassert(recordingParams.options.fileType == RecordingFileType::mono);
+        if (mStereoRouting) {
+            return getSeparateStereoFilePaths();
+        }
+
+        return getSeparateSpeakersFilePath();
+    };
+
+    auto const filePaths{ getFilePaths() };
 
     // Delete files if needed
     auto deleteAllFiles{ false };
     for (auto const & fileName : filePaths) {
-        // delete file if needed
         juce::File file{ fileName };
         if (file.existsAsFile()) {
             if (!deleteAllFiles) {
@@ -352,9 +370,60 @@ bool AudioManager::prepareToRecord(RecordingParameters const & recordingParams)
         }
     }
 
-    // Make recorders
     auto const recordingBufferSize{ RECORDERS_BUFFER_SIZE_IN_SAMPLES * recordingParams.speakersToRecord.size() };
-    if (recordingParams.options.fileType == RecordingFileType::mono) {
+
+    auto const makeInterleavedStereoRecorder = [&]() {
+        jassert(filePaths.size() == 1);
+        jassert(mStereoOutputBuffer.getNumChannels() == 2);
+        juce::Array<float const *> dataToRecord{};
+        dataToRecord.add(mStereoOutputBuffer.getReadPointer(0));
+        dataToRecord.add(mStereoOutputBuffer.getReadPointer(1));
+        auto recorder{ makeRecordingInfo(filePaths[0],
+                                         *audioFormat,
+                                         recordingParams.sampleRate,
+                                         recordingBufferSize,
+                                         std::move(dataToRecord),
+                                         mRecordersThread) };
+        if (!recorder) {
+            return false;
+        }
+        mRecorders.add(std::move(recorder));
+        return true;
+    };
+    auto const makeSeparateStereoRecorder = [&]() {
+        jassert(filePaths.size() == 2);
+        jassert(mStereoOutputBuffer.getNumChannels() == 2);
+        for (int i{}; i < 2; ++i) {
+            auto recorder{ makeRecordingInfo(filePaths[i],
+                                             *audioFormat,
+                                             recordingParams.sampleRate,
+                                             recordingBufferSize,
+                                             juce::Array<float const *>{ mStereoOutputBuffer.getReadPointer(i) },
+                                             mRecordersThread) };
+            if (!recorder) {
+                return false;
+            }
+            mRecorders.add(std::move(recorder));
+        }
+        return true;
+    };
+    auto const makeInterleavedSpeakersRecorder = [&]() {
+        jassert(filePaths.size() == 1);
+        auto const & filePath{ filePaths[0] };
+        auto dataToRecord{ mOutputBuffer.getArrayOfReadPointers(recordingParams.speakersToRecord) };
+        auto recordingInfo{ makeRecordingInfo(filePath,
+                                              *audioFormat,
+                                              recordingParams.sampleRate,
+                                              recordingBufferSize,
+                                              std::move(dataToRecord),
+                                              mRecordersThread) };
+        if (!recordingInfo) {
+            return false;
+        }
+        mRecorders.add(std::move(recordingInfo));
+        return true;
+    };
+    auto const makeSeparateSpeakersRecorder = [&]() {
         jassert(recordingParams.speakersToRecord.size() == filePaths.size());
         for (int i{}; i < recordingParams.speakersToRecord.size(); ++i) {
             auto const outputPatch{ recordingParams.speakersToRecord[i] };
@@ -372,21 +441,30 @@ bool AudioManager::prepareToRecord(RecordingParameters const & recordingParams)
             }
             mRecorders.add(std::move(recordingInfo));
         }
-    } else {
-        jassert(recordingParams.options.fileType == RecordingFileType::interleaved);
-        jassert(filePaths.size() == 1);
-        auto const & filePath{ filePaths[0] };
-        auto dataToRecord{ mOutputBuffer.getArrayOfReadPointers(recordingParams.speakersToRecord) };
-        auto recordingInfo{ makeRecordingInfo(filePath,
-                                              *audioFormat,
-                                              recordingParams.sampleRate,
-                                              recordingBufferSize,
-                                              std::move(dataToRecord),
-                                              mRecordersThread) };
-        if (!recordingInfo) {
-            return false;
+        return true;
+    };
+
+    auto const makeRecorders = [&]() {
+        auto const isInterleaved{ recordingParams.options.fileType == RecordingFileType::interleaved };
+        if (mStereoRouting) {
+            if (isInterleaved) {
+                return makeInterleavedStereoRecorder();
+            }
+            return makeSeparateStereoRecorder();
         }
-        mRecorders.add(std::move(recordingInfo));
+
+        if (isInterleaved) {
+            return makeInterleavedSpeakersRecorder();
+        }
+
+        return makeSeparateSpeakersRecorder();
+    };
+
+    // Make recorders
+    auto const success{ makeRecorders() };
+    if (!success) {
+        jassertfalse;
+        return false;
     }
 
     mRecordersThread.startThread();
@@ -439,6 +517,15 @@ void AudioManager::setBufferSize(int const newBufferSize)
     juce::ScopedLock const lock{ mAudioProcessor->getLock() };
     mInputBuffer.setNumSamples(newBufferSize);
     mOutputBuffer.setNumSamples(newBufferSize);
+    mStereoOutputBuffer.setSize(2, newBufferSize);
+}
+
+//==============================================================================
+void AudioManager::setStereoRouting(tl::optional<StereoRouting> const & stereoRouting)
+{
+    JUCE_ASSERT_MESSAGE_THREAD;
+    juce::ScopedLock const lock{ mAudioProcessor->getLock() };
+    mStereoRouting = stereoRouting;
 }
 
 //==============================================================================

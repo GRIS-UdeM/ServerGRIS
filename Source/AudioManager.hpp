@@ -59,6 +59,8 @@ private:
     juce::AudioDeviceManager mAudioDeviceManager{};
     SourceAudioBuffer mInputBuffer{};
     SpeakerAudioBuffer mOutputBuffer{};
+    juce::AudioBuffer<float> mStereoOutputBuffer{};
+    tl::optional<StereoRouting> mStereoRouting{};
     // Recording
     bool mIsRecording{};
     juce::Atomic<int64_t> mNumSamplesRecorded{};
@@ -92,6 +94,7 @@ public:
     void initInputBuffer(juce::Array<source_index_t> const & sources);
     void initOutputBuffer(juce::Array<output_patch_t> const & speakers);
     void setBufferSize(int newBufferSize);
+    void setStereoRouting(tl::optional<StereoRouting> const & stereoRouting);
     //==============================================================================
     // AudioSourcePlayer overrides
     void audioDeviceError(const juce::String & errorMessage) override;

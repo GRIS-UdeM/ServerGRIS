@@ -50,7 +50,9 @@ public:
     //==============================================================================
     void setAudioConfig(std::unique_ptr<AudioConfig> newAudioConfig);
     [[nodiscard]] juce::CriticalSection const & getLock() const noexcept { return mLock; }
-    void processAudio(SourceAudioBuffer & sourceBuffer, SpeakerAudioBuffer & speakerBuffer) noexcept;
+    void processAudio(SourceAudioBuffer & sourceBuffer,
+                      SpeakerAudioBuffer & speakerBuffer,
+                      juce::AudioBuffer<float> & stereoBuffer) noexcept;
 
     auto & getAudioData() { return mAudioData; }
     auto const & getAudioData() const { return mAudioData; }
