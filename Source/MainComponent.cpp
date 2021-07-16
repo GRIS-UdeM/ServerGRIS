@@ -584,16 +584,9 @@ void MainContentComponent::setStereoMode(tl::optional<StereoMode> const stereoMo
 
     mData.appData.viewSettings.showSpeakerTriplets = false;
     mData.appData.stereoMode = stereoMode;
+
     refreshSpatAlgorithm();
-
-    for (auto const & source : mData.project.sources) {
-        if (!source.value->position) {
-            continue;
-        }
-
-        updateSourceSpatData(source.key);
-    }
-
+    refreshSpeakerVuMeterComponents();
     refreshViewportConfig();
 }
 
@@ -1350,11 +1343,21 @@ void MainContentComponent::refreshSpeakerVuMeterComponents()
 
     mSpeakersLayout->clearSections();
     mSpeakerVuMeterComponents.clear();
+    mStereoVuMeterComponents.clearQuick(true);
 
     auto const isAtLeastOneSpeakerSolo{ std::any_of(
         mData.speakerSetup.speakers.cbegin(),
         mData.speakerSetup.speakers.cend(),
         [](SpeakersData::ConstNode const & node) { return node.value->state == PortState::solo; }) };
+
+    if (mData.appData.stereoMode) {
+        mSpeakersLayout
+            ->addSection(mStereoVuMeterComponents.add(std::make_unique<StereoVuMeterComponent>("L", mSmallLookAndFeel)))
+            .withChildMinSize();
+        mSpeakersLayout
+            ->addSection(mStereoVuMeterComponents.add(std::make_unique<StereoVuMeterComponent>("R", mSmallLookAndFeel)))
+            .withChildMinSize();
+    }
 
     for (auto const outputPatch : mData.speakerSetup.ordering) {
         auto newVuMeter{ std::make_unique<SpeakerVuMeterComponent>(outputPatch, *this, mSmallLookAndFeel) };
@@ -1804,7 +1807,7 @@ void MainContentComponent::removeSpeaker(output_patch_t const outputPatch)
     mData.speakerSetup.ordering.removeFirstMatchingValue(outputPatch);
     mData.speakerSetup.speakers.remove(outputPatch);
 
-    refreshSpeakers();
+    [[maybe_unused]] auto const success{ refreshSpeakers() };
 }
 
 //==============================================================================

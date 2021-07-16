@@ -169,7 +169,7 @@ void LevelBox::setMuted(bool const muted)
 }
 
 //==============================================================================
-AbstractVuMeterComponent::AbstractVuMeterComponent(int const channel, SmallGrisLookAndFeel & lookAndFeel)
+AbstractVuMeterComponent::AbstractVuMeterComponent(juce::String const & id, SmallGrisLookAndFeel & lookAndFeel)
     : mLookAndFeel(lookAndFeel)
     , mLevelBox(lookAndFeel)
 {
@@ -190,7 +190,7 @@ AbstractVuMeterComponent::AbstractVuMeterComponent(int const channel, SmallGrisL
         initColors(button);
     };
 
-    auto const initMuteOrSoloLabel = [&](juce::Label & label, juce::String const & text) {
+    auto const initLabel = [&](juce::Label & label, juce::String const & text) {
         label.setText(text, juce::dontSendNotification);
         label.setJustificationType(juce::Justification::centred);
         label.setInterceptsMouseClicks(false, false);
@@ -200,21 +200,21 @@ AbstractVuMeterComponent::AbstractVuMeterComponent(int const channel, SmallGrisL
 
     // Id
     initButton(mIdButton);
-    initMuteOrSoloLabel(mIdLabel, juce::String{ channel });
+    initLabel(mIdLabel, id);
 
     // Mute button
     mMuteButton.setClickingTogglesState(true);
     initButton(mMuteButton);
 
     // Mute label
-    initMuteOrSoloLabel(mMuteLabel, "m");
+    initLabel(mMuteLabel, "m");
 
     // Solo button
     mSoloButton.setClickingTogglesState(true);
     initButton(mSoloButton);
 
     // Solo label
-    initMuteOrSoloLabel(mSoloLabel, "s");
+    initLabel(mSoloLabel, "s");
 
     // Level box
     addAndMakeVisible(mLevelBox);
@@ -273,6 +273,19 @@ int SpeakerVuMeterComponent::getMinHeight() const noexcept
 }
 
 //==============================================================================
+StereoVuMeterComponent::StereoVuMeterComponent(juce::String const & id, SmallGrisLookAndFeel & lookAndFeel)
+    : AbstractVuMeterComponent(id, lookAndFeel)
+{
+}
+
+//==============================================================================
+int StereoVuMeterComponent::getMinHeight() const noexcept
+{
+    return INNER_ELEMENTS_PADDING + ID_BUTTON_HEIGHT + INNER_ELEMENTS_PADDING + LevelBox::MIN_HEIGHT
+           + INNER_ELEMENTS_PADDING;
+}
+
+//==============================================================================
 void AbstractVuMeterComponent::resized()
 {
     JUCE_ASSERT_MESSAGE_THREAD;
@@ -322,7 +335,7 @@ SourceVuMeterComponent::SourceVuMeterComponent(source_index_t const sourceIndex,
                                                juce::Colour const colour,
                                                Owner & owner,
                                                SmallGrisLookAndFeel & lookAndFeel)
-    : AbstractVuMeterComponent(sourceIndex.get(), lookAndFeel)
+    : AbstractVuMeterComponent(juce::String{ sourceIndex.get() }, lookAndFeel)
     , mSourceIndex(sourceIndex)
     , mOwner(owner)
 {
@@ -517,7 +530,7 @@ juce::Colour SourceVuMeterComponent::getSourceColor() const
 SpeakerVuMeterComponent::SpeakerVuMeterComponent(output_patch_t const outputPatch,
                                                  Owner & owner,
                                                  SmallGrisLookAndFeel & lookAndFeel)
-    : AbstractVuMeterComponent(outputPatch.get(), lookAndFeel)
+    : AbstractVuMeterComponent(juce::String{ outputPatch.get() }, lookAndFeel)
     , mOutputPatch(outputPatch)
     , mOwner(owner)
 {

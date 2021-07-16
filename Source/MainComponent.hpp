@@ -78,6 +78,7 @@ class MainContentComponent final
 
     OwnedMap<source_index_t, SourceVuMeterComponent, MAX_NUM_SOURCES> mSourceVuMeterComponents{};
     OwnedMap<output_patch_t, SpeakerVuMeterComponent, MAX_NUM_SPEAKERS> mSpeakerVuMeterComponents{};
+    juce::OwnedArray<StereoVuMeterComponent> mStereoVuMeterComponents{};
 
     std::unique_ptr<OscInput> mOscInput{};
 

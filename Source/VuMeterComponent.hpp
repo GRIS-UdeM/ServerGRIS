@@ -91,7 +91,7 @@ protected:
 
 public:
     //==============================================================================
-    explicit AbstractVuMeterComponent(int channel, SmallGrisLookAndFeel & lookAndFeel);
+    explicit AbstractVuMeterComponent(juce::String const & id, SmallGrisLookAndFeel & lookAndFeel);
     //==============================================================================
     AbstractVuMeterComponent() = delete;
     ~AbstractVuMeterComponent() override = default;
@@ -211,3 +211,19 @@ private:
     //==============================================================================
     JUCE_LEAK_DETECTOR(SpeakerVuMeterComponent)
 }; // class LevelComponent
+
+//==============================================================================
+class StereoVuMeterComponent final : public AbstractVuMeterComponent
+{
+public:
+    StereoVuMeterComponent(juce::String const & id, SmallGrisLookAndFeel & lookAndFeel);
+    ~StereoVuMeterComponent() override = default;
+
+    StereoVuMeterComponent(StereoVuMeterComponent const &) = delete;
+    StereoVuMeterComponent(StereoVuMeterComponent &&) = delete;
+    StereoVuMeterComponent & operator=(StereoVuMeterComponent const &) = delete;
+    StereoVuMeterComponent & operator=(StereoVuMeterComponent &&) = delete;
+
+    [[nodiscard]] int getMinHeight() const noexcept override;
+    void buttonClicked(juce::Button *) override {}
+};
