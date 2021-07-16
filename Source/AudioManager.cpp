@@ -45,7 +45,9 @@ AudioManager::AudioManager(juce::String const & deviceType,
                            juce::String const & outputDevice,
 
                            double const sampleRate,
-                           int const bufferSize)
+                           int const bufferSize,
+                           tl::optional<StereoRouting> const & stereoRouting)
+    : mStereoRouting(stereoRouting)
 {
     JUCE_ASSERT_MESSAGE_THREAD;
 
@@ -84,8 +86,11 @@ void AudioManager::audioDeviceIOCallback(float const ** inputChannelData,
 
     // clear buffers
     mInputBuffer.silence();
-    mOutputBuffer.silence();
-    mStereoOutputBuffer.clear();
+    if (mStereoRouting) {
+        mStereoOutputBuffer.clear();
+    } else {
+        mOutputBuffer.silence();
+    }
     std::for_each_n(outputChannelData, totalNumOutputChannels, [numSamples](float * const data) {
         std::fill_n(data, numSamples, 0.0f);
     });
@@ -110,7 +115,19 @@ void AudioManager::audioDeviceIOCallback(float const ** inputChannelData,
     }
 
     // copy buffers to output
-    mOutputBuffer.copyToPhysicalOutput(outputChannelData, totalNumOutputChannels);
+    if (mStereoRouting) {
+        jassert(mStereoOutputBuffer.getNumChannels() == 2);
+        auto const leftIndex{ mStereoRouting->left.template removeOffset<int>() };
+        auto const rightIndex{ mStereoRouting->right.template removeOffset<int>() };
+        if (leftIndex < totalNumOutputChannels) {
+            std::copy_n(mStereoOutputBuffer.getReadPointer(0), numSamples, outputChannelData[leftIndex]);
+        }
+        if (rightIndex < totalNumOutputChannels) {
+            std::copy_n(mStereoOutputBuffer.getReadPointer(1), numSamples, outputChannelData[rightIndex]);
+        }
+    } else {
+        mOutputBuffer.copyToPhysicalOutput(outputChannelData, totalNumOutputChannels);
+    }
 
     // Record
     if (mIsRecording) {
@@ -192,10 +209,11 @@ void AudioManager::init(juce::String const & deviceType,
                         juce::String const & inputDevice,
                         juce::String const & outputDevice,
                         double const sampleRate,
-                        int const bufferSize)
+                        int const bufferSize,
+                        tl::optional<StereoRouting> const & stereoRouting)
 {
     JUCE_ASSERT_MESSAGE_THREAD;
-    mInstance.reset(new AudioManager{ deviceType, inputDevice, outputDevice, sampleRate, bufferSize });
+    mInstance.reset(new AudioManager{ deviceType, inputDevice, outputDevice, sampleRate, bufferSize, stereoRouting });
 }
 
 //==============================================================================
@@ -310,15 +328,15 @@ bool AudioManager::prepareToRecord(RecordingParameters const & recordingParams)
 
     auto const getSeparateStereoFilePaths = [&]() {
         juce::StringArray result{};
-        result.add(baseOutputFile + "L" + extension);
-        result.add(baseOutputFile + "R" + extension);
+        result.add(baseOutputFile + "-L" + extension);
+        result.add(baseOutputFile + "-R" + extension);
         return result;
     };
     auto const getSeparateSpeakersFilePath = [&]() {
         juce::StringArray result{};
         result.ensureStorageAllocated(recordingParams.speakersToRecord.size());
         for (auto const outputPatch : recordingParams.speakersToRecord) {
-            auto const path{ baseOutputFile + juce::String{ outputPatch.get() } + extension };
+            auto const path{ baseOutputFile + "-" + juce::String{ outputPatch.get() } + extension };
             jassert(!result.contains(path));
             result.add(path);
         }

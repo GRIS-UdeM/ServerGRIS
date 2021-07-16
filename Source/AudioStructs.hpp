@@ -103,11 +103,11 @@ struct SourceAudioConfig {
 };
 
 //==============================================================================
-struct StereoConfig {
-    StereoMode stereoMode{};
-    output_patch_t leftPatch{};
-    output_patch_t rightPatch{};
-};
+// struct StereoConfig {
+//    StereoMode stereoMode{};
+//    output_patch_t leftPatch{};
+//    output_patch_t rightPatch{};
+//};
 
 //==============================================================================
 using SourcesAudioConfig = StaticMap<source_index_t, SourceAudioConfig, MAX_NUM_SOURCES>;
@@ -116,7 +116,7 @@ using SpeakersAudioConfig = StaticMap<output_patch_t, SpeakerAudioConfig, MAX_NU
 //==============================================================================
 struct AudioConfig {
     SpatMode spatMode{};
-    tl::optional<StereoConfig> stereoConfig{};
+    bool isStereo{};
     float masterGain{};
     float spatGainsInterpolation{};
 

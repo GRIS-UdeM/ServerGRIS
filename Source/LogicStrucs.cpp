@@ -847,8 +847,7 @@ std::unique_ptr<AudioConfig> SpatGrisData::toAudioConfig() const
     result->spatGainsInterpolation = project.spatGainsInterpolation;
 
     if (appData.stereoMode) {
-        result->stereoConfig
-            = StereoConfig{ *appData.stereoMode, appData.stereoRouting.left, appData.stereoRouting.right };
+        result->isStereo = appData.stereoMode.has_value();
 
         // direct outs are ignored in stereo mode
         result->directOutPairs.clearQuick();

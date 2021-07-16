@@ -89,6 +89,7 @@ MainContentComponent::MainContentComponent(MainWindow & mainWindow,
     JUCE_ASSERT_MESSAGE_THREAD;
     juce::ScopedWriteLock const lock{ mLock };
 
+    //==============================================================================
     auto const showSplashScreen = [&]() {
 #if NDEBUG
         if (SPLASH_SCREEN_FILE.exists()) {
@@ -100,24 +101,10 @@ MainContentComponent::MainContentComponent(MainWindow & mainWindow,
 #endif
     };
 
-    auto const initAudioManager = [&]() {
-        auto const & audioSettings{ mData.appData.audioSettings };
-        AudioManager::init(audioSettings.deviceType,
-                           audioSettings.inputDevice,
-                           audioSettings.outputDevice,
-                           audioSettings.sampleRate,
-                           audioSettings.bufferSize);
-    };
+    //==============================================================================
+    auto const initAppData = [&]() { mData.appData = mConfiguration.load(); };
 
-    auto const initAudioProcessor = [&]() {
-        mAudioProcessor = std::make_unique<AudioProcessor>();
-        juce::ScopedLock const audioLock{ mAudioProcessor->getLock() };
-        auto & audioManager{ AudioManager::getInstance() };
-        audioManager.registerAudioProcessor(mAudioProcessor.get());
-        AudioManager::getInstance().getAudioDeviceManager().addChangeListener(this);
-        audioParametersChanged();
-    };
-
+    //==============================================================================
     auto const initGui = [&]() {
         // Set look and feel
         juce::LookAndFeel::setDefaultLookAndFeel(&grisLookAndFeel);
@@ -195,12 +182,7 @@ MainContentComponent::MainContentComponent(MainWindow & mainWindow,
         mSpeakerViewComponent->setCameraPosition(mData.appData.cameraPosition);
     };
 
-    auto const startOsc = [&]() {
-        mOscInput.reset(new OscInput(*this));
-        mOscInput->startConnection(mData.project.oscPort);
-    };
-
-    auto const initAppData = [&]() { mData.appData = mConfiguration.load(); };
+    //==============================================================================
     auto const initProject = [&]() {
         auto const success{ loadProject(mData.appData.lastProject, true) };
         if (!success) {
@@ -210,6 +192,7 @@ MainContentComponent::MainContentComponent(MainWindow & mainWindow,
         }
     };
 
+    //==============================================================================
     auto const initSpeakerSetup = [&]() {
         if (!loadSpeakerSetup(mData.appData.lastSpeakerSetup, LoadSpeakerSetupOption::allowDiscardingUnsavedChanges)) {
             if (!loadSpeakerSetup(DEFAULT_SPEAKER_SETUP_FILE, LoadSpeakerSetupOption::allowDiscardingUnsavedChanges)) {
@@ -218,6 +201,34 @@ MainContentComponent::MainContentComponent(MainWindow & mainWindow,
         }
     };
 
+    //==============================================================================
+    auto const initAudioManager = [&]() {
+        auto const & audioSettings{ mData.appData.audioSettings };
+        AudioManager::init(audioSettings.deviceType,
+                           audioSettings.inputDevice,
+                           audioSettings.outputDevice,
+                           audioSettings.sampleRate,
+                           audioSettings.bufferSize,
+                           mData.appData.stereoMode ? tl::make_optional(mData.appData.stereoRouting) : tl::nullopt);
+    };
+
+    //==============================================================================
+    auto const initAudioProcessor = [&]() {
+        mAudioProcessor = std::make_unique<AudioProcessor>();
+        juce::ScopedLock const audioLock{ mAudioProcessor->getLock() };
+        auto & audioManager{ AudioManager::getInstance() };
+        audioManager.registerAudioProcessor(mAudioProcessor.get());
+        AudioManager::getInstance().getAudioDeviceManager().addChangeListener(this);
+        audioParametersChanged();
+    };
+
+    //==============================================================================
+    auto const startOsc = [&]() {
+        mOscInput.reset(new OscInput(*this));
+        mOscInput->startConnection(mData.project.oscPort);
+    };
+
+    //==============================================================================
     auto const initCommandManager = [&]() {
         auto & commandManager{ mMainWindow.getApplicationCommandManager() };
         commandManager.registerAllCommandsForTarget(this);
@@ -585,19 +596,22 @@ void MainContentComponent::setStereoMode(tl::optional<StereoMode> const stereoMo
     mData.appData.viewSettings.showSpeakerTriplets = false;
     mData.appData.stereoMode = stereoMode;
 
+    AudioManager::getInstance().setStereoRouting(stereoMode ? tl::make_optional(mData.appData.stereoRouting)
+                                                            : tl::nullopt);
+
     refreshSpatAlgorithm();
     refreshSpeakerVuMeterComponents();
     refreshViewportConfig();
 }
 
 //==============================================================================
-void MainContentComponent::stereoRoutingChanged(StereoRouting const & routing)
+void MainContentComponent::setStereoRouting(StereoRouting const & routing)
 {
     JUCE_ASSERT_MESSAGE_THREAD;
     juce::ScopedWriteLock const lock{ mLock };
 
     mData.appData.stereoRouting = routing;
-    refreshSpatAlgorithm();
+    AudioManager::getInstance().setStereoRouting(mData.appData.stereoMode ? tl::make_optional(routing) : tl::nullopt);
 }
 
 //==============================================================================
@@ -1287,6 +1301,22 @@ void MainContentComponent::updatePeaks()
         }
     }
 
+    if (mData.appData.stereoMode) {
+        auto *& stereoPeaksTicket{ mData.mostRecentStereoPeaks };
+        audioData.stereoPeaks.getMostRecent(stereoPeaksTicket);
+        if (stereoPeaksTicket == nullptr) {
+            return;
+        }
+
+        auto const & stereoPeaks{ stereoPeaksTicket->get() };
+        for (size_t i{}; i < 2; ++i) {
+            auto const & peak{ stereoPeaks[i] };
+            auto const dbPeak{ dbfs_t::fromGain(peak) };
+            mStereoVuMeterComponents[static_cast<int>(i)]->setLevel(dbPeak);
+        }
+        return;
+    }
+
     auto *& speakerPeaksTicket{ mData.mostRecentSpeakerPeaks };
     audioData.speakerPeaks.getMostRecent(speakerPeaksTicket);
     if (speakerPeaksTicket == nullptr) {
@@ -1357,14 +1387,14 @@ void MainContentComponent::refreshSpeakerVuMeterComponents()
         mSpeakersLayout
             ->addSection(mStereoVuMeterComponents.add(std::make_unique<StereoVuMeterComponent>("R", mSmallLookAndFeel)))
             .withChildMinSize();
-    }
-
-    for (auto const outputPatch : mData.speakerSetup.ordering) {
-        auto newVuMeter{ std::make_unique<SpeakerVuMeterComponent>(outputPatch, *this, mSmallLookAndFeel) };
-        auto const & state{ mData.speakerSetup.speakers[outputPatch].state };
-        newVuMeter->setState(state, isAtLeastOneSpeakerSolo);
-        auto & addedVuMeter{ mSpeakerVuMeterComponents.add(outputPatch, std::move(newVuMeter)) };
-        mSpeakersLayout->addSection(&addedVuMeter).withChildMinSize();
+    } else {
+        for (auto const outputPatch : mData.speakerSetup.ordering) {
+            auto newVuMeter{ std::make_unique<SpeakerVuMeterComponent>(outputPatch, *this, mSmallLookAndFeel) };
+            auto const & state{ mData.speakerSetup.speakers[outputPatch].state };
+            newVuMeter->setState(state, isAtLeastOneSpeakerSolo);
+            auto & addedVuMeter{ mSpeakerVuMeterComponents.add(outputPatch, std::move(newVuMeter)) };
+            mSpeakersLayout->addSection(&addedVuMeter).withChildMinSize();
+        }
     }
 
     mSpeakersLayout->resized();
@@ -1547,7 +1577,9 @@ void MainContentComponent::setSelectedSpeakers(juce::Array<output_patch_t> const
         }
 
         speaker.value->isSelected = isSelected;
-        mSpeakerVuMeterComponents[speaker.key].setSelected(isSelected);
+        if (mSpeakerVuMeterComponents.contains(speaker.key)) {
+            mSpeakerVuMeterComponents[speaker.key].setSelected(isSelected);
+        }
 
         if (!isSelected || !mEditSpeakersWindow) {
             continue;

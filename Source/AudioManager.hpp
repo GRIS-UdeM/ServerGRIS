@@ -110,7 +110,8 @@ public:
                      juce::String const & inputDevice,
                      juce::String const & outputDevice,
                      double sampleRate,
-                     int bufferSize);
+                     int bufferSize,
+                     tl::optional<StereoRouting> const & stereoRouting);
     static void free();
     [[nodiscard]] static AudioManager & getInstance();
 
@@ -120,7 +121,8 @@ private:
                  juce::String const & inputDevice,
                  juce::String const & outputDevice,
                  double sampleRate,
-                 int bufferSize);
+                 int bufferSize,
+                 tl::optional<StereoRouting> const & stereoRouting);
     //==============================================================================
     [[nodiscard]] bool tryInitAudioDevice(juce::String const & deviceType,
                                           juce::String const & inputDevice,

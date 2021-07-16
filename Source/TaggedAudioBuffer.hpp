@@ -116,7 +116,8 @@ public:
             }
             auto const * const origin{ buffer.value->getReadPointer(0) };
             auto * const dest{ outs[outIndex] };
-            std::transform(origin, origin + mNumSamples, dest, dest, std::plus());
+            std::copy_n(origin, mNumSamples, dest);
+            // std::transform(origin, origin + mNumSamples, dest, dest, std::plus());
         }
     }
     //==============================================================================

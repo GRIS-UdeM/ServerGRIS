@@ -136,14 +136,23 @@ void AudioProcessor::processAudio(SourceAudioBuffer & sourceBuffer,
         }
     }
 
-    // Process speaker peaks/gains/highpass
-    auto * speakerPeaksTicket{ mAudioData.speakerPeaks.acquire() };
-    auto & speakerPeaks{ speakerPeaksTicket->get() };
-    muteSoloVuMeterGainOut(speakerBuffer, speakerPeaks);
-
-    // return peaks data to message thread
+    // Process peaks/gains/highpass
     mAudioData.sourcePeaks.setMostRecent(sourcePeaksTicket);
-    mAudioData.speakerPeaks.setMostRecent(speakerPeaksTicket);
+
+    if (mAudioData.config->isStereo) {
+        auto * stereoPeaksTicket{ mAudioData.stereoPeaks.acquire() };
+        auto & stereoPeaks{ stereoPeaksTicket->get() };
+        for (int i{}; i < 2; ++i) {
+            stereoPeaks[static_cast<size_t>(i)] = stereoBuffer.getMagnitude(i, 0, numSamples);
+        }
+        mAudioData.stereoPeaks.setMostRecent(stereoPeaksTicket);
+    } else {
+        auto * speakerPeaksTicket{ mAudioData.speakerPeaks.acquire() };
+        auto & speakerPeaks{ speakerPeaksTicket->get() };
+        // Process speaker peaks/gains/highpass
+        muteSoloVuMeterGainOut(speakerBuffer, speakerPeaks);
+        mAudioData.speakerPeaks.setMostRecent(speakerPeaksTicket);
+    }
 }
 
 //==============================================================================

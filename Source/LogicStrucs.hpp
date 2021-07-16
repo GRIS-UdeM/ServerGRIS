@@ -352,6 +352,7 @@ struct SpatGrisData {
     tl::optional<dbfs_t> pinkNoiseLevel{};
     AtomicExchanger<SourcePeaks>::Ticket * mostRecentSourcePeaks{};
     AtomicExchanger<SpeakerPeaks>::Ticket * mostRecentSpeakerPeaks{};
+    AtomicExchanger<StereoPeaks>::Ticket * mostRecentStereoPeaks{};
     //==============================================================================
     [[nodiscard]] std::unique_ptr<AudioConfig> toAudioConfig() const;
     [[nodiscard]] ViewportConfig toViewportConfig() const noexcept;

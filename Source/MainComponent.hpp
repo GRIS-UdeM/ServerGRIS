@@ -197,7 +197,7 @@ public:
     // Control Panel
     [[nodiscard]] bool setSpatMode(SpatMode spatMode);
     void setStereoMode(tl::optional<StereoMode> stereoMode);
-    void stereoRoutingChanged(StereoRouting const & routing);
+    void setStereoRouting(StereoRouting const & routing);
     void cubeAttenuationDbChanged(dbfs_t value);
     void cubeAttenuationHzChanged(hz_t value);
     void numSourcesChanged(int numSources);

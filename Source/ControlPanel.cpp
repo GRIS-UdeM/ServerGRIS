@@ -380,7 +380,7 @@ void SpatSettingsSubPanel::comboBoxChanged(juce::ComboBox * comboBoxThatHasChang
                                      output_patch_t{ mRightCombo.getSelectedId() } };
         jassert(routing.left != routing.right);
 
-        mMainContentComponent.stereoRoutingChanged(routing);
+        mMainContentComponent.setStereoRouting(routing);
         updateEnabledStereoRoutings();
 
         return;
