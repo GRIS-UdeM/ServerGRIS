@@ -19,6 +19,9 @@
 
 #include "StereoSpatAlgorithm.hpp"
 #include "DummySpatAlgorithm.hpp"
+#include "StaticMap.hpp"
+#include "StrongArray.hpp"
+#include "TaggedAudioBuffer.hpp"
 
 //==============================================================================
 void StereoSpatAlgorithm::updateSpatData(source_index_t const sourceIndex, SourceData const & sourceData) noexcept
@@ -31,7 +34,7 @@ void StereoSpatAlgorithm::updateSpatData(source_index_t const sourceIndex, Sourc
 
     using fast = juce::dsp::FastMathApproximations;
 
-    auto & queue{ mData.sourcesData[sourceIndex].gainsQueue };
+    auto & queue{ mData[sourceIndex].gainsQueue };
     auto * ticket{ queue.acquire() };
     auto & gains{ ticket->get() };
 
@@ -58,18 +61,19 @@ void StereoSpatAlgorithm::updateSpatData(source_index_t const sourceIndex, Sourc
 void StereoSpatAlgorithm::process(AudioConfig const & config,
                                   SourceAudioBuffer & sourcesBuffer,
                                   SpeakerAudioBuffer & speakersBuffer,
+                                  juce::AudioBuffer<float> & stereoBuffer,
                                   SourcePeaks const & sourcePeaks,
                                   [[maybe_unused]] SpeakersAudioConfig const * altSpeakerConfig)
 {
     ASSERT_AUDIO_THREAD;
     jassert(!altSpeakerConfig);
-    jassert(speakersBuffer.contains(mData.routing.left) && speakersBuffer.contains(mData.routing.right));
+    jassert(stereoBuffer.getNumChannels() == 2);
 
     auto const & gainInterpolation{ config.spatGainsInterpolation };
     auto const gainFactor{ std::pow(gainInterpolation, 0.1f) * 0.0099f + 0.99f };
 
-    std::array<juce::AudioBuffer<float> *, 2> const buffers{ &speakersBuffer[mData.routing.left],
-                                                             &speakersBuffer[mData.routing.right] };
+    // std::array<juce::AudioBuffer<float> *, 2> const buffers{ &speakersBuffer[mData.routing.left],
+    //                                                         &speakersBuffer[mData.routing.right] };
 
     auto const numSamples{ sourcesBuffer.getNumSamples() };
     for (auto const & source : config.sourcesAudioConfig) {
@@ -77,7 +81,7 @@ void StereoSpatAlgorithm::process(AudioConfig const & config,
             continue;
         }
 
-        auto & data{ mData.sourcesData[source.key] };
+        auto & data{ mData[source.key] };
 
         data.gainsQueue.getMostRecent(data.currentGains);
         if (data.currentGains == nullptr) {
@@ -89,11 +93,12 @@ void StereoSpatAlgorithm::process(AudioConfig const & config,
         auto const * inputSamples{ sourcesBuffer[source.key].getReadPointer(0) };
 
         static constexpr std::array<size_t, 2> SPEAKERS{ 0, 1 };
+        auto * const * const buffers{ stereoBuffer.getArrayOfWritePointers() };
 
         for (auto const & speaker : SPEAKERS) {
             auto & currentGain{ lastGains[speaker] };
             auto const & targetGain{ gains[speaker] };
-            auto * outputSamples{ buffers[speaker]->getWritePointer(0) };
+            auto * outputSamples{ buffers[speaker] };
             if (gainInterpolation == 0.0f) {
                 // linear interpolation over buffer size
                 auto const gainSlope = (targetGain - currentGain) / narrow<float>(numSamples);
@@ -122,8 +127,7 @@ void StereoSpatAlgorithm::process(AudioConfig const & config,
 
     // Apply gain compensation.
     auto const compensation{ std::pow(10.0f, (narrow<float>(config.sourcesAudioConfig.size()) - 1.0f) * -0.005f) };
-    buffers[0]->applyGain(0, numSamples, compensation);
-    buffers[1]->applyGain(0, numSamples, compensation);
+    stereoBuffer.applyGain(0, numSamples, compensation);
 }
 
 //==============================================================================
@@ -136,24 +140,16 @@ juce::Array<Triplet> StereoSpatAlgorithm::getTriplets() const noexcept
 
 //==============================================================================
 std::unique_ptr<AbstractSpatAlgorithm> StereoSpatAlgorithm::make(SpeakerSetup const & speakerSetup,
-                                                                 SourcesData const & sources,
-                                                                 StereoRouting const & routing)
+                                                                 SourcesData const & sources)
 {
     JUCE_ASSERT_MESSAGE_THREAD;
 
-    if (!speakerSetup.ordering.contains(routing.left) || !speakerSetup.ordering.contains(routing.right)) {
-        return std::make_unique<DummySpatAlgorithm>(Error::stereoOutputUnavailable);
-    }
-
-    return std::make_unique<StereoSpatAlgorithm>(speakerSetup, sources, routing);
+    return std::make_unique<StereoSpatAlgorithm>(speakerSetup, sources);
 }
 
 //==============================================================================
-StereoSpatAlgorithm::StereoSpatAlgorithm(SpeakerSetup const & speakerSetup,
-                                         SourcesData const & sources,
-                                         StereoRouting const & routing)
+StereoSpatAlgorithm::StereoSpatAlgorithm(SpeakerSetup const & speakerSetup, SourcesData const & sources)
 {
     JUCE_ASSERT_MESSAGE_THREAD;
-    mData.routing = routing;
     fixDirectOutsIntoPlace(sources, speakerSetup);
 }

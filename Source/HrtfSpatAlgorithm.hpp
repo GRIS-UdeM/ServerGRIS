@@ -20,6 +20,8 @@
 #pragma once
 
 #include "AbstractSpatAlgorithm.hpp"
+#include "StaticMap.hpp"
+#include "StrongArray.hpp"
 #include "TaggedAudioBuffer.hpp"
 
 //==============================================================================
@@ -27,7 +29,6 @@ struct HrtfData {
     SpeakersAudioConfig speakersAudioConfig{};
     SpeakerAudioBuffer speakersBuffer{};
     StrongArray<output_patch_t, bool, MAX_NUM_SPEAKERS> hadSoundLastBlock{};
-    StereoRouting routing{};
 };
 
 //==============================================================================
@@ -41,7 +42,6 @@ public:
     //==============================================================================
     HrtfSpatAlgorithm(SpeakerSetup const & speakerSetup,
                       SourcesData const & sources,
-                      StereoRouting const & stereoRouting,
                       double sampleRate,
                       int bufferSize);
     //==============================================================================
@@ -57,17 +57,15 @@ public:
     void process(AudioConfig const & config,
                  SourceAudioBuffer & sourcesBuffer,
                  SpeakerAudioBuffer & speakersBuffer,
+                 juce::AudioBuffer<float> & stereoBuffer,
                  SourcePeaks const & sourcePeaks,
                  SpeakersAudioConfig const * altSpeakerConfig) override;
     [[nodiscard]] juce::Array<Triplet> getTriplets() const noexcept override;
     [[nodiscard]] bool hasTriplets() const noexcept override { return false; }
     [[nodiscard]] tl::optional<Error> getError() const noexcept override { return tl::nullopt; }
     //==============================================================================
-    static std::unique_ptr<AbstractSpatAlgorithm> make(SpeakerSetup const & speakerSetup,
-                                                       SourcesData const & sources,
-                                                       StereoRouting const & routing,
-                                                       double sampleRate,
-                                                       int bufferSize);
+    static std::unique_ptr<AbstractSpatAlgorithm>
+        make(SpeakerSetup const & speakerSetup, SourcesData const & sources, double sampleRate, int bufferSize);
 
 private:
     //==============================================================================

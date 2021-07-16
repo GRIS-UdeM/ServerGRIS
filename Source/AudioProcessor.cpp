@@ -126,7 +126,7 @@ void AudioProcessor::processAudio(SourceAudioBuffer & sourceBuffer,
         fillWithPinkNoise(data.data(), numSamples, narrow<int>(data.size()), *mAudioData.config->pinkNoiseGain);
     } else {
         // Process spat algorithm
-        mSpatAlgorithm->process(*mAudioData.config, sourceBuffer, speakerBuffer, sourcePeaks, nullptr);
+        mSpatAlgorithm->process(*mAudioData.config, sourceBuffer, speakerBuffer, stereoBuffer, sourcePeaks, nullptr);
 
         // Process direct outs
         for (auto const & directOutPair : mAudioData.config->directOutPairs) {

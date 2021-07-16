@@ -39,7 +39,6 @@ public:
         notEnoughDomeSpeakers,
         notEnoughCubeSpeakers,
         flatDomeSpeakersTooFarApart,
-        stereoOutputUnavailable,
     };
     //==============================================================================
     AbstractSpatAlgorithm() = default;
@@ -56,6 +55,7 @@ public:
     virtual void process(AudioConfig const & config,
                          SourceAudioBuffer & sourcesBuffer,
                          SpeakerAudioBuffer & speakersBuffer,
+                         juce::AudioBuffer<float> & stereoBuffer,
                          SourcePeaks const & sourcePeaks,
                          SpeakersAudioConfig const * altSpeakerConfig)
         = 0;
@@ -66,7 +66,6 @@ public:
     [[nodiscard]] static std::unique_ptr<AbstractSpatAlgorithm> make(SpeakerSetup const & speakerSetup,
                                                                      tl::optional<StereoMode> stereoMode,
                                                                      SourcesData const & sources,
-                                                                     StereoRouting const & routing,
                                                                      double sampleRate,
                                                                      int bufferSize);
 

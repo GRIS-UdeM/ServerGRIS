@@ -20,6 +20,9 @@
 #pragma once
 
 #include "AbstractSpatAlgorithm.hpp"
+#include "StaticMap.hpp"
+#include "StrongArray.hpp"
+#include "TaggedAudioBuffer.hpp"
 #include "vbap.hpp"
 
 VbapType getVbapType(SpeakersData const & speakers);
@@ -52,6 +55,7 @@ public:
     void process(AudioConfig const & config,
                  SourceAudioBuffer & sourcesBuffer,
                  SpeakerAudioBuffer & speakersBuffer,
+                 juce::AudioBuffer<float> & stereoBuffer,
                  SourcePeaks const & sourcePeaks,
                  SpeakersAudioConfig const * altSpeakerConfig) override;
     [[nodiscard]] juce::Array<Triplet> getTriplets() const noexcept override;

@@ -20,6 +20,9 @@
 #pragma once
 
 #include "AbstractSpatAlgorithm.hpp"
+#include "StaticMap.hpp"
+#include "StrongArray.hpp"
+#include "TaggedAudioBuffer.hpp"
 #include "lbap.hpp"
 
 struct LbapSpatData {
@@ -58,6 +61,7 @@ public:
     void process(AudioConfig const & config,
                  SourceAudioBuffer & sourceBuffer,
                  SpeakerAudioBuffer & speakersBuffer,
+                 juce::AudioBuffer<float> & stereoBuffer,
                  SourcePeaks const & sourcesPeaks,
                  SpeakersAudioConfig const * altSpeakerConfig) override;
     [[nodiscard]] juce::Array<Triplet> getTriplets() const noexcept override;

@@ -140,6 +140,7 @@ struct AudioState {
 //==============================================================================
 using SourcePeaks = StrongArray<source_index_t, float, MAX_NUM_SOURCES>;
 using SpeakerPeaks = StrongArray<output_patch_t, float, MAX_NUM_SPEAKERS>;
+using StereoPeaks = std::array<float, 2>;
 
 //==============================================================================
 struct AudioData {
@@ -152,4 +153,5 @@ struct AudioData {
     // audio thread -> message thread (hot)
     AtomicExchanger<SourcePeaks> sourcePeaks{};
     AtomicExchanger<SpeakerPeaks> speakerPeaks{};
+    AtomicExchanger<StereoPeaks> stereoPeaks{};
 };

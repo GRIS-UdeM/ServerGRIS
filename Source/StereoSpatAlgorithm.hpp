@@ -20,9 +20,11 @@
 #pragma once
 
 #include "AbstractSpatAlgorithm.hpp"
+#include "StaticMap.hpp"
+#include "StrongArray.hpp"
+#include "TaggedAudioBuffer.hpp"
 
 using StereoSpeakerGains = std::array<float, 2>;
-
 using StereoGainsQueue = AtomicExchanger<StereoSpeakerGains>;
 
 struct StereoSourceData {
@@ -33,19 +35,14 @@ struct StereoSourceData {
 
 using StereoSourcesData = StrongArray<source_index_t, StereoSourceData, MAX_NUM_SOURCES>;
 
-struct StereoData {
-    StereoSourcesData sourcesData{};
-    StereoRouting routing{};
-};
-
 //==============================================================================
 class StereoSpatAlgorithm final : public AbstractSpatAlgorithm
 {
-    StereoData mData{};
+    StereoSourcesData mData{};
 
 public:
     //==============================================================================
-    StereoSpatAlgorithm(SpeakerSetup const & speakerSetup, SourcesData const & sources, StereoRouting const & routing);
+    StereoSpatAlgorithm(SpeakerSetup const & speakerSetup, SourcesData const & sources);
     ~StereoSpatAlgorithm() override = default;
     //==============================================================================
     StereoSpatAlgorithm(StereoSpatAlgorithm const &) = delete;
@@ -57,14 +54,14 @@ public:
     void process(AudioConfig const & config,
                  SourceAudioBuffer & sourcesBuffer,
                  SpeakerAudioBuffer & speakersBuffer,
+                 juce::AudioBuffer<float> & stereoBuffer,
                  SourcePeaks const & sourcePeaks,
                  SpeakersAudioConfig const * altSpeakerConfig) override;
     [[nodiscard]] juce::Array<Triplet> getTriplets() const noexcept override;
     [[nodiscard]] bool hasTriplets() const noexcept override { return false; }
     [[nodiscard]] tl::optional<Error> getError() const noexcept override { return tl::nullopt; }
     //==============================================================================
-    static std::unique_ptr<AbstractSpatAlgorithm>
-        make(SpeakerSetup const & speakerSetup, SourcesData const & sources, StereoRouting const & routing);
+    static std::unique_ptr<AbstractSpatAlgorithm> make(SpeakerSetup const & speakerSetup, SourcesData const & sources);
 
 private:
     JUCE_LEAK_DETECTOR(StereoSpatAlgorithm)

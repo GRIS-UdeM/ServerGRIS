@@ -19,6 +19,9 @@
 
 #include "VbapSpatAlgorithm.hpp"
 #include "DummySpatAlgorithm.hpp"
+#include "StaticMap.hpp"
+#include "StrongArray.hpp"
+#include "TaggedAudioBuffer.hpp"
 
 //==============================================================================
 VbapType getVbapType(SpeakersData const & speakers)
@@ -82,6 +85,7 @@ void VbapSpatAlgorithm::updateSpatData(source_index_t const sourceIndex, SourceD
 void VbapSpatAlgorithm::process(AudioConfig const & config,
                                 SourceAudioBuffer & sourcesBuffer,
                                 SpeakerAudioBuffer & speakersBuffer,
+                                [[maybe_unused]] juce::AudioBuffer<float> & stereoBuffer,
                                 SourcePeaks const & sourcePeaks,
                                 SpeakersAudioConfig const * altSpeakerConfig)
 {

@@ -21,6 +21,9 @@
 
 #include "DummySpatAlgorithm.hpp"
 #include "LbapSpatAlgorithm.hpp"
+#include "StaticMap.hpp"
+#include "StrongArray.hpp"
+#include "TaggedAudioBuffer.hpp"
 #include "VbapSpatAlgorithm.hpp"
 
 static constexpr size_t MAX_BUFFER_SIZE = 2048;
@@ -28,9 +31,8 @@ static constexpr size_t MAX_BUFFER_SIZE = 2048;
 //==============================================================================
 HrtfSpatAlgorithm::HrtfSpatAlgorithm(SpeakerSetup const & speakerSetup,
                                      SourcesData const & sources,
-                                     StereoRouting const & stereoRouting,
-                                     double sampleRate,
-                                     int bufferSize)
+                                     double const sampleRate,
+                                     int const bufferSize)
 {
     JUCE_ASSERT_MESSAGE_THREAD;
 
@@ -105,8 +107,6 @@ HrtfSpatAlgorithm::HrtfSpatAlgorithm(SpeakerSetup const & speakerSetup,
         convolution.reset();
     }
 
-    mHrtfData.routing = stereoRouting;
-
     fixDirectOutsIntoPlace(sources, speakerSetup);
 }
 
@@ -126,12 +126,13 @@ void HrtfSpatAlgorithm::updateSpatData(source_index_t const sourceIndex, SourceD
 void HrtfSpatAlgorithm::process(AudioConfig const & config,
                                 SourceAudioBuffer & sourcesBuffer,
                                 SpeakerAudioBuffer & speakersBuffer,
+                                juce::AudioBuffer<float> & stereoBuffer,
                                 SourcePeaks const & sourcePeaks,
                                 [[maybe_unused]] SpeakersAudioConfig const * altSpeakerConfig)
 {
     ASSERT_AUDIO_THREAD;
     jassert(!altSpeakerConfig);
-    jassert(speakersBuffer.contains(mHrtfData.routing.left) && speakersBuffer.contains(mHrtfData.routing.right));
+    jassert(stereoBuffer.getNumChannels() == 2);
 
     speakersBuffer.silence();
 
@@ -139,12 +140,10 @@ void HrtfSpatAlgorithm::process(AudioConfig const & config,
     jassert(hrtfBuffer.size() == 16);
     hrtfBuffer.silence();
 
-    mInnerAlgorithm->process(config, sourcesBuffer, hrtfBuffer, sourcePeaks, &mHrtfData.speakersAudioConfig);
+    mInnerAlgorithm
+        ->process(config, sourcesBuffer, hrtfBuffer, stereoBuffer, sourcePeaks, &mHrtfData.speakersAudioConfig);
 
     auto const numSamples{ sourcesBuffer.getNumSamples() };
-
-    std::array<juce::AudioBuffer<float> *, 2> const outputBuffers{ &speakersBuffer[mHrtfData.routing.left],
-                                                                   &speakersBuffer[mHrtfData.routing.right] };
 
     static juce::AudioBuffer<float> convolutionBuffer{};
     convolutionBuffer.setSize(2, numSamples);
@@ -173,13 +172,13 @@ void HrtfSpatAlgorithm::process(AudioConfig const & config,
         juce::dsp::AudioBlock<float> block{ convolutionBuffer };
         juce::dsp::ProcessContextReplacing<float> const context{ block };
         mConvolutions[speakerIndex].process(context);
-        auto const & result{ context.getOutputBlock() };
+        // auto const & result{ context.getOutputBlock() };
         if (!REVERSE[speakerIndex]) {
-            outputBuffers[0]->addFrom(0, 0, result.getChannelPointer(0), numSamples);
-            outputBuffers[1]->addFrom(0, 0, result.getChannelPointer(1), numSamples);
+            stereoBuffer.addFrom(0, 0, convolutionBuffer, 0, 0, numSamples);
+            stereoBuffer.addFrom(1, 0, convolutionBuffer, 1, 0, numSamples);
         } else {
-            outputBuffers[1]->addFrom(0, 0, result.getChannelPointer(0), numSamples);
-            outputBuffers[0]->addFrom(0, 0, result.getChannelPointer(1), numSamples);
+            stereoBuffer.addFrom(0, 0, convolutionBuffer, 1, 0, numSamples);
+            stereoBuffer.addFrom(1, 0, convolutionBuffer, 0, 0, numSamples);
         }
 
         speakerIndex++;
@@ -197,15 +196,9 @@ juce::Array<Triplet> HrtfSpatAlgorithm::getTriplets() const noexcept
 //==============================================================================
 std::unique_ptr<AbstractSpatAlgorithm> HrtfSpatAlgorithm::make(SpeakerSetup const & speakerSetup,
                                                                SourcesData const & sources,
-                                                               StereoRouting const & routing,
                                                                double const sampleRate,
                                                                int const bufferSize)
 {
     JUCE_ASSERT_MESSAGE_THREAD;
-
-    if (!speakerSetup.ordering.contains(routing.left) || !speakerSetup.ordering.contains(routing.right)) {
-        return std::make_unique<DummySpatAlgorithm>(Error::stereoOutputUnavailable);
-    }
-
-    return std::make_unique<HrtfSpatAlgorithm>(speakerSetup, sources, routing, sampleRate, bufferSize);
+    return std::make_unique<HrtfSpatAlgorithm>(speakerSetup, sources, sampleRate, bufferSize);
 }

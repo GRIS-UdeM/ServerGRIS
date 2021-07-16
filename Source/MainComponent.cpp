@@ -1618,7 +1618,6 @@ void MainContentComponent::refreshSpatAlgorithm()
     auto newSpatAlgorithm{ AbstractSpatAlgorithm::make(mData.speakerSetup,
                                                        mData.appData.stereoMode,
                                                        mData.project.sources,
-                                                       mData.appData.stereoRouting,
                                                        mData.appData.audioSettings.sampleRate,
                                                        mData.appData.audioSettings.bufferSize) };
 
@@ -1644,13 +1643,6 @@ void MainContentComponent::refreshSpatAlgorithm()
                                                    "Disabled spatialization",
                                                    "If all speakers are at the same height, Domes require their "
                                                    "speakers not to be more than 170 degrees apart from each others.\n",
-                                                   "Ok",
-                                                   this);
-            break;
-        case AbstractSpatAlgorithm::Error::stereoOutputUnavailable:
-            juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::AlertIconType::InfoIcon,
-                                                   "Stereo output disabled",
-                                                   "An output patch used for stereo reduction is unavailable.",
                                                    "Ok",
                                                    this);
             break;

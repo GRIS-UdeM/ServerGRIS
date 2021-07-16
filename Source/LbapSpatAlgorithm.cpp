@@ -19,6 +19,9 @@
 
 #include "LbapSpatAlgorithm.hpp"
 #include "DummySpatAlgorithm.hpp"
+#include "StaticMap.hpp"
+#include "StrongArray.hpp"
+#include "TaggedAudioBuffer.hpp"
 
 //==============================================================================
 LbapSpatAlgorithm::LbapSpatAlgorithm(SpeakersData const & speakers) : mField(lbapInit(speakers))
@@ -49,9 +52,10 @@ void LbapSpatAlgorithm::updateSpatData(source_index_t const sourceIndex, SourceD
 
 //==============================================================================
 void LbapSpatAlgorithm::process(AudioConfig const & config,
-                                SourceAudioBuffer & sourcesBuffer,
+                                SourceAudioBuffer & sourceBuffer,
                                 SpeakerAudioBuffer & speakersBuffer,
-                                SourcePeaks const & sourcePeaks,
+                                [[maybe_unused]] juce::AudioBuffer<float> & stereoBuffer,
+                                SourcePeaks const & sourcesPeaks,
                                 SpeakersAudioConfig const * altSpeakerConfig)
 {
     ASSERT_AUDIO_THREAD;
@@ -59,12 +63,12 @@ void LbapSpatAlgorithm::process(AudioConfig const & config,
     auto const & gainInterpolation{ config.spatGainsInterpolation };
 
     auto const gainFactor{ std::pow(gainInterpolation, 0.1f) * 0.0099f + 0.99f };
-    auto const numSamples{ sourcesBuffer.getNumSamples() };
+    auto const numSamples{ sourceBuffer.getNumSamples() };
 
     auto const & speakersAudioConfig{ altSpeakerConfig ? *altSpeakerConfig : config.speakersAudioConfig };
 
     for (auto const & source : config.sourcesAudioConfig) {
-        if (source.value.isMuted || source.value.directOut || sourcePeaks[source.key] < SMALL_GAIN) {
+        if (source.value.isMuted || source.value.directOut || sourcesPeaks[source.key] < SMALL_GAIN) {
             // speaker silent
             continue;
         }
@@ -81,7 +85,7 @@ void LbapSpatAlgorithm::process(AudioConfig const & config,
         auto & lastGains{ data.lastGains };
 
         // process attenuation
-        auto * inputSamples{ sourcesBuffer[source.key].getWritePointer(0) };
+        auto * inputSamples{ sourceBuffer[source.key].getWritePointer(0) };
         config.lbapAttenuationConfig.process(inputSamples,
                                              numSamples,
                                              spatData.lbapSourceDistance,
