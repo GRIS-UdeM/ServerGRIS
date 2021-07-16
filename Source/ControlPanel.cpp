@@ -186,17 +186,14 @@ bool SpatSettingsSubPanel::shouldShowStereoRouting() const
 }
 
 //==============================================================================
-void SpatSettingsSubPanel::updateSpeakers(SpeakersOrdering speakers, StereoRouting const & routing)
+void SpatSettingsSubPanel::updateMaxOutputPatch(output_patch_t const maxOutputPatch, StereoRouting const & routing)
 {
-    speakers.sort();
-
     mLeftCombo.clear(juce::dontSendNotification);
     mRightCombo.clear(juce::dontSendNotification);
 
-    for (auto const & outputPatch : speakers) {
-        auto const outputPatchInt{ outputPatch.get() };
-        mLeftCombo.addItem(juce::String{ outputPatchInt }, outputPatchInt);
-        mRightCombo.addItem(juce::String{ outputPatchInt }, outputPatchInt);
+    for (output_patch_t i{ output_patch_t::OFFSET }; i <= maxOutputPatch; ++i) {
+        mLeftCombo.addItem(juce::String{ i.get() }, i.get());
+        mRightCombo.addItem(juce::String{ i.get() }, i.get());
     }
 
     mLeftCombo.setSelectedId(routing.left.get(), juce::dontSendNotification);
@@ -482,10 +479,10 @@ void ControlPanel::setStereoRouting(StereoRouting const & routing)
 }
 
 //==============================================================================
-void ControlPanel::updateSpeakers(SpeakersOrdering ordering, StereoRouting const & routing)
+void ControlPanel::updateMaxOutputPatch(output_patch_t const maxOutputPatch, StereoRouting const & routing)
 {
     JUCE_ASSERT_MESSAGE_THREAD;
-    mSpatSettingsSubPanel.updateSpeakers(std::move(ordering), routing);
+    mSpatSettingsSubPanel.updateMaxOutputPatch(maxOutputPatch, routing);
 }
 
 //==============================================================================

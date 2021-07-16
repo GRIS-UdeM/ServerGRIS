@@ -1114,6 +1114,9 @@ void MainContentComponent::audioParametersChanged()
         mInfoPanel->setBufferSize(bufferSize);
         mInfoPanel->setNumInputs(inputCount);
         mInfoPanel->setNumOutputs(outputCount);
+
+        output_patch_t const maxOutputPatch{ outputCount };
+        mControlPanel->updateMaxOutputPatch(maxOutputPatch, mData.appData.stereoRouting);
     }
 
     refreshSpeakers();
@@ -1855,7 +1858,6 @@ bool MainContentComponent::refreshSpeakers()
     if (mEditSpeakersWindow != nullptr) {
         mEditSpeakersWindow->updateWinContent();
     }
-    mControlPanel->updateSpeakers(mData.speakerSetup.ordering, mData.appData.stereoRouting);
 
     return true;
 }

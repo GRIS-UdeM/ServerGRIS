@@ -38,7 +38,6 @@
 #include "SpeakerViewComponent.hpp"
 #include "StrongTypes.hpp"
 #include "TitledComponent.hpp"
-#include "Triplet.hpp"
 #include "VuMeterComponent.hpp"
 #include "constants.hpp"
 

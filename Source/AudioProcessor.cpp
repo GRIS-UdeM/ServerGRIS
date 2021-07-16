@@ -140,10 +140,14 @@ void AudioProcessor::processAudio(SourceAudioBuffer & sourceBuffer,
     mAudioData.sourcePeaks.setMostRecent(sourcePeaksTicket);
 
     if (mAudioData.config->isStereo) {
+        auto const & masterGain{ mAudioData.config->masterGain };
+        if (masterGain != 0.0f) {
+            stereoBuffer.applyGain(masterGain);
+        }
         auto * stereoPeaksTicket{ mAudioData.stereoPeaks.acquire() };
         auto & stereoPeaks{ stereoPeaksTicket->get() };
         for (int i{}; i < 2; ++i) {
-            stereoPeaks[static_cast<size_t>(i)] = stereoBuffer.getMagnitude(i, 0, numSamples);
+            stereoPeaks[narrow<size_t>(i)] = stereoBuffer.getMagnitude(i, 0, numSamples);
         }
         mAudioData.stereoPeaks.setMostRecent(stereoPeaksTicket);
     } else {

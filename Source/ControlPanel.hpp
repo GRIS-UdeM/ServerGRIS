@@ -127,7 +127,7 @@ public:
     SpatSettingsSubPanel & operator=(SpatSettingsSubPanel const &) = delete;
     SpatSettingsSubPanel & operator=(SpatSettingsSubPanel &&) = delete;
     //==============================================================================
-    void updateSpeakers(SpeakersOrdering speakers, StereoRouting const & routing);
+    void updateMaxOutputPatch(output_patch_t maxOutputPatch, StereoRouting const & routing);
     //==============================================================================
     void setSpatMode(SpatMode spatMode);
     void setStereoMode(tl::optional<StereoMode> const & stereoMode);
@@ -186,7 +186,7 @@ public:
     void setCubeAttenuationHz(hz_t value);
     void setRecordButtonState(RecordButton::State state);
     void setStereoRouting(StereoRouting const & routing);
-    void updateSpeakers(SpeakersOrdering ordering, StereoRouting const & routing);
+    void updateMaxOutputPatch(output_patch_t maxOutputPatch, StereoRouting const & routing);
     //==============================================================================
     void resized() override;
     void forceLayoutUpdate();
