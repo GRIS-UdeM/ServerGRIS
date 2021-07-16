@@ -109,13 +109,14 @@ public:
     void copyToPhysicalOutput(float * const * outs, int const numOutputs) const
     {
         for (auto const buffer : mBuffers) {
-            auto const outIndex{ buffer.key.get() - decltype(buffer.key)::OFFSET };
+            auto const outIndex{ buffer.key.template removeOffset<int>() };
             jassert(outIndex >= 0);
-            if (outIndex < numOutputs) {
-                auto const * origin{ buffer.value->getReadPointer(0) };
-                auto * dest{ outs[outIndex] };
-                std::transform(origin, origin + mNumSamples, dest, dest, std::plus());
+            if (outIndex >= numOutputs) {
+                continue;
             }
+            auto const * const origin{ buffer.value->getReadPointer(0) };
+            auto * const dest{ outs[outIndex] };
+            std::transform(origin, origin + mNumSamples, dest, dest, std::plus());
         }
     }
     //==============================================================================
